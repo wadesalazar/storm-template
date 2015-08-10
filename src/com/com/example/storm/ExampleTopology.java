@@ -55,6 +55,7 @@ public class ExampleTopology{
 	    // Fields for possible partition
 	    //String[] partNames = {"name"};
 	    // Fields for possible column data
+	    // add columns to match destination table 
 	    String[] colNames = {"value1"};
 	    // Record Writer configuration
 	    DelimitedRecordHiveMapper mapper = new DelimitedRecordHiveMapper()
@@ -117,12 +118,27 @@ public class ExampleTopology{
 
 		private static final long serialVersionUID = 1L;
 		
+		
+		
 		public void execute(Tuple input, BasicOutputCollector collector) {
 			String payload = "";
 			if(input.getSourceComponent().equals("kafka-spout")){
 				payload = new String((byte[]) input.getValue(0));
 			}else if(input.getSourceComponent().equals("rmq-spout")){
 				payload = input.getString(0);
+				
+				/*
+				 * String inputString = new String((byte[]) input.getValueByField(fields.get(0)), "UTF-8");
+		                String[] inputArray = inputString.split(",");
+		                Values values = new Values(df.parse(stockData[0]), Float.parseFloat(stockData[1]),
+		                        Float.parseFloat(stockData[2]),Float.parseFloat(stockData[3]),
+		                        Float.parseFloat(stockData[4]),Integer.parseInt(stockData[5]), 
+		                        Float.parseFloat(stockData[6]),stockData[7]);
+		                outputCollector.emit(values);
+				 * */
+				
+				
+				
 			}else{
 				payload = "unknown message from spout: " + input.getSourceComponent();
 			}
@@ -130,7 +146,7 @@ public class ExampleTopology{
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
-			// TODO Auto-generated method stub
+			// add comma delimited list of fields below
 			declarer.declare(new Fields("value1"));
 		}
 	}

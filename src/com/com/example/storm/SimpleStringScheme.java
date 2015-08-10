@@ -1,6 +1,7 @@
 package com.example.storm;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -30,16 +31,20 @@ public class SimpleStringScheme implements Scheme {
 
     public List<Object> deserialize(byte[] ser) {
         String chars = null;
+        List<String> items = null;
         try {
             chars = new String(ser, encoding);
+            items = Arrays.asList(chars.split("\\s*,\\s*"));
+            //need to ensure the number of provided fields matches header and error
         } catch (UnsupportedEncodingException e) {
             //logger.error("fail to deserialize");
         }
 
-        return Collections.singletonList((Object)chars);
+        return Collections.singletonList((Object)items);
     }
 
     public Fields getOutputFields() {
+    	//not sure how to return multiple fields here
         return new Fields("value1");
     }
 
