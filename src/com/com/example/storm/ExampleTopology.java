@@ -35,7 +35,7 @@ public class ExampleTopology{
 		
 		/*-------------------------------------------------------------------- 
 	     * Kafka Spout configuration\
-	     * adding comment
+	     * adding comment from another computer
 	     -------------------------------------------------------------------- * */
 		String kafkaTopic = "ex_topic";
         SpoutConfig spoutConfig = new SpoutConfig(new ZkHosts("mimas.saturn:2181,rhea.saturn:2181,titan.saturn:2181"),
