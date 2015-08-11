@@ -1,6 +1,9 @@
 package com.example.storm;
 
 
+import java.io.UnsupportedEncodingException;
+
+
 import backtype.storm.Config;
 import backtype.storm.StormSubmitter;
 import backtype.storm.spout.Scheme;
@@ -33,12 +36,29 @@ public class ExampleTopology{
 
 	public static void main(String[] args) throws Exception {
 		
+		//Kakfa
+		String kafkaTopic = "ex_topic";
+		String kafkaZkHosts = "mimas.saturn:2181,rhea.saturn:2181,titan.saturn:2181";
+		//Hive
+		String hivemetastorURI = "thrift://titan.saturn:9083";
+	    String hiveDB = "default";
+	    String hiveTable = "test3";
+	    String[] hiveTableCols = {"value1"};
+		//Storm
+	    String stormTopic = "ExampleTopo";
+		//RabbitMQ
+		String rmqServer = "rhea.saturn";
+	    String rmqServerPort = "5672";
+	    String rmqUserID = "test";
+	    String rmqUserPW = "test";
+	    String rmqQueue = "test_queue";
+		
 		/*-------------------------------------------------------------------- 
 	     * Kafka Spout configuration\
 	     * adding comment from another computer
 	     -------------------------------------------------------------------- * */
-		String kafkaTopic = "ex_topic";
-        SpoutConfig spoutConfig = new SpoutConfig(new ZkHosts("mimas.saturn:2181,rhea.saturn:2181,titan.saturn:2181"),
+		// do we need to make the dir and name configurable?
+        SpoutConfig spoutConfig = new SpoutConfig(new ZkHosts(kafkaZkHosts),
                 kafkaTopic, "/kafka_storm", "StormSpout");
         spoutConfig.useStartOffsetTimeIfOffsetOutOfRange = true;
         spoutConfig.startOffsetTime = System.currentTimeMillis();
@@ -48,22 +68,16 @@ public class ExampleTopology{
         /*-------------------------------------------------------------------- 
 	     * Hive Bolt Config
 	     -------------------------------------------------------------------- * */        
-		// Hive connection configuration
-	    String metaStoreURI = "thrift://titan.saturn:9083";
-	    String dbName = "default";
-	    String tblName = "test3";
 	    // Fields for possible partition
 	    //String[] partNames = {"name"};
-	    // Fields for possible column data
-	    // add columns to match destination table 
-	    String[] colNames = {"value1"};
+	    
 	    // Record Writer configuration
 	    DelimitedRecordHiveMapper mapper = new DelimitedRecordHiveMapper()
-	            .withColumnFields(new Fields(colNames));
+	            .withColumnFields(new Fields(hiveTableCols));
 	    //        .withPartitionFields(new Fields(partNames));
 
 	    HiveOptions hiveOptions;
-	    hiveOptions = new HiveOptions(metaStoreURI, dbName, tblName, mapper)
+	    hiveOptions = new HiveOptions(hivemetastorURI, hiveDB, hiveTable, mapper)
 	            .withTxnsPerBatch(2)
 	            .withBatchSize(10)
 	            .withIdleTimeout(10);
@@ -77,15 +91,15 @@ public class ExampleTopology{
 	    IRichSpout rabbitmq_spout = new RabbitMQSpout(scheme);
 	    
 	    ConnectionConfig connectionConfig = new ConnectionConfig(
-	    		"rhea.saturn", 
-	    		5672, 
-	    		"test", 
-	    		"test", 
+	    		rmqServer, 
+	    		Integer.parseInt(rmqServerPort), 
+	    		rmqUserID, 
+	    		rmqUserPW, 
 	    		ConnectionFactory.DEFAULT_VHOST, 
 	    		10); 
 	    // host, port, username, password, virtualHost, heartBeat 
 	    ConsumerConfig spoutConfig1 = new ConsumerConfigBuilder().connection(connectionConfig)
-	                                                            .queue("test_queue")
+	                                                            .queue(rmqQueue)
 	                                                            .prefetch(200)
 	                                                            .requeueOnFail()
 	                                                            .build();
@@ -96,58 +110,68 @@ public class ExampleTopology{
 		
 		TopologyBuilder builder = new TopologyBuilder();
 
-		//builder.setSpout("name", new ExampleSpout(), 1);
 		builder.setSpout("kafka-spout", kafkaSpout);
 		
 		builder.setSpout("rmq-spout", rabbitmq_spout)
 	       .addConfigurations(spoutConfig1.asMap())
 	       .setMaxSpoutPending(200);
 		
-		builder.setBolt("prep-bolt", new PrepBolt()).shuffleGrouping("kafka-spout").shuffleGrouping("rmq-spout");
-		builder.setBolt("store-bolt", new HiveBolt(hiveOptions)).shuffleGrouping("prep-bolt");
+		builder.setBolt("prep-bolt", new PrepBolt(hiveTableCols))
+			.shuffleGrouping("kafka-spout")
+			.shuffleGrouping("rmq-spout");
+		builder.setBolt("store-bolt", new HiveBolt(hiveOptions))
+			.shuffleGrouping("prep-bolt");
 
 		Config conf = new Config();
 		conf.setDebug(true);
 
 		conf.setNumWorkers(1);
-		StormSubmitter.submitTopologyWithProgressBar("ExampleTopo", conf, builder.createTopology());
+		StormSubmitter.submitTopologyWithProgressBar(stormTopic, conf, builder.createTopology());
 
 	}
 	
 	public static class PrepBolt extends BaseBasicBolt{
 
 		private static final long serialVersionUID = 1L;
+		private Fields fields = null;		
 		
-		
+		PrepBolt(String[] hiveTableCols){
+			fields = new Fields(hiveTableCols);
+		}
 		
 		public void execute(Tuple input, BasicOutputCollector collector) {
-			String payload = "";
+			//we should check that the number of expected fields match the number found in the tuple
+			Fields inFields = input.getFields();
+			Values values = null;
+			
+			String inputString = null;
+			String[] inputArray = null;
+					
 			if(input.getSourceComponent().equals("kafka-spout")){
-				payload = new String((byte[]) input.getValue(0));
+				
+				values = new Values(input.getString(0));
+			
 			}else if(input.getSourceComponent().equals("rmq-spout")){
-				payload = input.getString(0);
-				
-				/*
-				 * String inputString = new String((byte[]) input.getValueByField(fields.get(0)), "UTF-8");
-		                String[] inputArray = inputString.split(",");
-		                Values values = new Values(df.parse(stockData[0]), Float.parseFloat(stockData[1]),
-		                        Float.parseFloat(stockData[2]),Float.parseFloat(stockData[3]),
-		                        Float.parseFloat(stockData[4]),Integer.parseInt(stockData[5]), 
-		                        Float.parseFloat(stockData[6]),stockData[7]);
-		                outputCollector.emit(values);
-				 * */
-				
-				
+
+				try {
+					inputString = new String((byte[]) input.getValueByField(inFields.get(0)), "UTF-8");
+					inputArray = inputString.split(",");
+				} catch (UnsupportedEncodingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+		       
+				values = new Values(inputArray.toString());
 				
 			}else{
-				payload = "unknown message from spout: " + input.getSourceComponent();
+				//need error logging here
 			}
-			collector.emit(new Values(payload));
+			collector.emit(values);
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
 			// add comma delimited list of fields below
-			declarer.declare(new Fields("value1"));
+			declarer.declare(fields);
 		}
 	}
 
