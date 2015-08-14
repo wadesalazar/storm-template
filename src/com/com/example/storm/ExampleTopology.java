@@ -42,8 +42,8 @@ public class ExampleTopology{
 		//Hive
 		String hivemetastorURI = "thrift://titan.saturn:9083";
 	    String hiveDB = "default";
-	    String hiveTable = "test3";
-	    String[] hiveTableCols = {"value1"};
+	    String hiveTable = "ex_table";
+	    String[] hiveTableCols = {"value1","value2","value3"};
 		//Storm
 	    String stormTopic = "ExampleTopo";
 		//RabbitMQ
@@ -149,12 +149,17 @@ public class ExampleTopology{
 					
 			if(input.getSourceComponent().equals("kafka-spout")){
 				
-				values = new Values(new String((byte[]) input.getValue(0)));
+				inputString = new String((byte[]) input.getValue(0));
+				inputArray = inputString.split(",");
+				values = new Values(inputArray[0],inputArray[1],inputArray[2]);
 			
 			}else if(input.getSourceComponent().equals("rmq-spout")){
 				try {
-					inputString = new String((byte[]) input.getValueByField(inFields.get(0)), "UTF-8");
+					inputString = input.getString(0);
+					
 					inputArray = inputString.split(",");
+					inputArray.
+					values = new Values(inputArray[0],inputArray[1],inputArray[2]);
 				} catch (UnsupportedEncodingException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
