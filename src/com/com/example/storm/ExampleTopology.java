@@ -59,7 +59,7 @@ public class ExampleTopology{
 	     -------------------------------------------------------------------- * */
 		// do we need to make the dir and name configurable?
         SpoutConfig spoutConfig = new SpoutConfig(new ZkHosts(kafkaZkHosts),
-                kafkaTopic, "/kafka_storm", "StormSpout");
+                kafkaTopic, "/brokers", "StormSpout");
         spoutConfig.useStartOffsetTimeIfOffsetOutOfRange = true;
         spoutConfig.startOffsetTime = System.currentTimeMillis();
 
@@ -149,16 +149,18 @@ public class ExampleTopology{
 					
 			if(input.getSourceComponent().equals("kafka-spout")){
 				
-				values = new Values(input.getString(0));
+				values = new Values(new String((byte[]) input.getValue(0)));
 			
 			}else if(input.getSourceComponent().equals("rmq-spout")){
-
 				try {
 					inputString = new String((byte[]) input.getValueByField(inFields.get(0)), "UTF-8");
 					inputArray = inputString.split(",");
 				} catch (UnsupportedEncodingException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
+				} catch (Exception e){
+					
+					
 				}
 		       
 				values = new Values(inputArray.toString());
